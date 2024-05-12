@@ -126,6 +126,9 @@ impl RunDir {
             let run_command = &mut self.run_command.0;
             if let Some(file) = &self.input_file {
                 case.write_input(file, name)?;
+                let input_path = self.temp_dir.path().join(file.to_str().unwrap());
+                let input_file = handle_error!(File::open(input_path), "Failed to open input file");
+                run_command.stdin(input_file);
             } else {
                 let input_path = self.temp_dir.path().join("tmp.in");
                 case.write_input(&input_path, name)?;
@@ -154,17 +157,18 @@ impl RunDir {
             if !exit_status.success() {
                 return Err(format!("\nProgram exited with non-zero exit code: {}", exit_status.code().unwrap()));
             }
-            let output = if let Some(file) = &self.output_file {
-                handle_error!(
-                    fs::read(file),
-                    format!(
-                        "\nFailed to read from output file({}), most likely means your program doesn't create the necessary file",
-                        file.file_name().unwrap().to_str().unwrap()
-                    )
-                )
-            } else {
-                run_command.stdout.take().unwrap().bytes().map(|b| b.unwrap()).collect::<Vec<u8>>()
-            };
+            // let output = if let Some(file) = &self.output_file {
+            //     handle_error!(
+            //         fs::read(file),
+            //         format!(
+            //             "\nFailed to read from output file({}), most likely means your program doesn't create the necessary file",
+            //             file.file_name().unwrap().to_str().unwrap()
+            //         )
+            //     )
+            // } else {
+            //     run_command.stdout.take().unwrap().bytes().map(|b| b.unwrap()).collect::<Vec<u8>>()
+            // };
+            let output = run_command.stdout.take().unwrap().bytes().map(|b| b.unwrap()).collect::<Vec<u8>>();
             let output = handle_error!(String::from_utf8(output), "Failed to turn output into valid UTF-8");
             handle_error!(io::stdout().flush(), "\nFailed to flush stdout");
             if self.show_input {
